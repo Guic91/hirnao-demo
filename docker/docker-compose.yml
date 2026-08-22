@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: hirnao-postgres
+    environment:
+      POSTGRES_USER: hirnao
+      POSTGRES_PASSWORD: hirnao_dev
+      POSTGRES_DB: hirnao
+    ports:
+      - "5432:5432"
+    volumes:
+      - hirnao_pgdata:/var/lib/postgresql/data
+      - ../packages/db/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hirnao"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: hirnao-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - hirnao_redis:/data
+
+volumes:
+  hirnao_pgdata:
+  hirnao_redis:
