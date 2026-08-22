@@ -1,6 +1,8 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
+import { registerAuth } from "./lib/auth.js";
+import { initDb } from "./lib/db.js";
 import { authRoutes } from "./routes/auth.js";
 import { cardRoutes } from "./routes/cards.js";
 import { eventRoutes } from "./routes/events.js";
@@ -24,6 +26,7 @@ export async function buildApp() {
   await app.register(jwt, {
     secret: process.env.JWT_SECRET ?? "hirnao-dev-secret-change-in-prod",
   });
+  registerAuth(app);
 
   app.get("/health", async () => ({
     status: "ok",
@@ -46,6 +49,7 @@ export async function buildApp() {
 }
 
 async function main() {
+  await initDb();
   const app = await buildApp();
   await app.listen({ port: PORT, host: HOST });
   console.log(`HIRNAO API listening on http://${HOST}:${PORT}`);

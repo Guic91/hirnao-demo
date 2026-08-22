@@ -32,10 +32,22 @@ packages/ai       → Pipeline matching + agent
 ## Démarrage
 
 ```bash
-npm run docker:up    # PostgreSQL + Redis
 npm install
+npm run docker:up    # PostgreSQL + Redis (optionnel)
+npm run db:migrate   # Migrations (si PostgreSQL)
 npm run dev:api      # API sur :3001
+npm run dev:web      # PWA sur :3000
 ```
+
+Sans Docker, l'API démarre en **mode démo** (`DEMO_MODE=true`) avec données en mémoire.
+
+### Parcours participant (MVP)
+
+1. Ouvrir `/e/ai-summit-paris-2026` — accès événement via QR/slug
+2. Inscription rapide (email + nom)
+3. Onboarding agent → Card ID structurée
+4. Recommandations expliquées (top 5, sans swipe)
+5. Connexion mutuelle + visibilité événement
 
 ## Boucle produit
 
