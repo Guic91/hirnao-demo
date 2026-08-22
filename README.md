@@ -49,6 +49,17 @@ Sans Docker, l'API démarre en **mode démo** (`DEMO_MODE=true`) avec données e
 4. Recommandations expliquées (top 5, sans swipe)
 5. Connexion mutuelle + visibilité événement
 
+### Moteur matching + LLM (Step 3)
+
+Pipeline complet : **Filtre → Vector Search → Score → Shortlist → Agent↔Agent**
+
+- Client LLM OpenAI-compatible (`OPENAI_API_KEY`)
+- Embeddings réels (`text-embedding-3-small`) avec fallback hash
+- Agent↔Agent sur shortlist : compatibilité, explication, opener
+- Onboarding conversationnel LLM (fallback règles sans clé API)
+- Logging usage IA (`ai_usage_logs`)
+- Endpoints : `GET /v1/matching/status`, `GET /v1/agent/status`
+
 ## Boucle produit
 
 ```
