@@ -1,60 +1,35 @@
-import { createHash } from "crypto";
 import type { CardProfile } from "@hirnao/shared";
-import { AGENT_CONFIG } from "@hirnao/shared";
-import { runMatchingPipeline, toAgentContext } from "@hirnao/ai";
+import {
+  cardToEmbeddingText,
+  generateEmbedding,
+  runFullMatchingPipeline,
+  toAgentContext,
+} from "@hirnao/ai";
 import { query, queryOne } from "./db-pg.js";
 import { mapCard } from "./mappers.js";
-import { generateExplanation, generateOpener } from "./demo-agent.js";
+import { getAiRuntime } from "./ai-runtime.js";
+import { isDemoMode, demoStore } from "./db.js";
 
-export function cardToEmbeddingText(card: CardProfile): string {
-  return [
-    card.headline,
-    card.bio,
-    card.activity,
-    ...card.interests,
-    ...card.expertises,
-    ...card.intentions,
-    ...card.seeking,
-    ...card.offering,
-  ]
-    .filter(Boolean)
-    .join(" ");
-}
-
-/** Deterministic pseudo-embedding for demo (no OpenAI required) */
-export function generateEmbedding(text: string): number[] {
-  const dim = AGENT_CONFIG.EMBEDDING_DIMENSIONS;
-  const vector = new Array(dim).fill(0);
-
-  const tokens = text.toLowerCase().split(/\W+/).filter(Boolean);
-  for (const token of tokens) {
-    const hash = createHash("sha256").update(token).digest();
-    for (let i = 0; i < dim; i++) {
-      vector[i] += (hash[i % hash.length] / 255 - 0.5) * 2;
-    }
-  }
-
-  const norm = Math.sqrt(vector.reduce((s, v) => s + v * v, 0)) || 1;
-  return vector.map((v) => v / norm);
-}
+export { cardToEmbeddingText, toAgentContext };
 
 export async function upsertCardEmbedding(cardId: string, card: CardProfile) {
   const text = cardToEmbeddingText(card);
-  const embedding = generateEmbedding(text);
+  const { embedding, model } = await generateEmbedding(text);
   const vectorStr = `[${embedding.join(",")}]`;
 
-  await query(
-    `DELETE FROM card_embeddings WHERE card_id = $1`,
-    [cardId],
-  );
+  await query(`DELETE FROM card_embeddings WHERE card_id = $1`, [cardId]);
   await query(
     `INSERT INTO card_embeddings (card_id, embedding, model_version) VALUES ($1, $2::vector, $3)`,
-    [cardId, vectorStr, "demo-hash-v1"],
+    [cardId, vectorStr, model],
   );
 }
 
 export async function generateRecommendations(eventId: string, userId: string) {
-  // Ensure all event cards have embeddings for vector search
+  if (isDemoMode()) {
+    const { generateDemoRecommendationsWithAgents } = await import("./data.js");
+    return generateDemoRecommendationsWithAgents(userId, eventId);
+  }
+
   const allCards = await query(
     `SELECT cp.* FROM card_profiles cp
      JOIN event_participants ep ON ep.user_id = cp.user_id AND ep.event_id = $1
@@ -67,31 +42,38 @@ export async function generateRecommendations(eventId: string, userId: string) {
   }
 
   const participant = await queryOne(
-    `SELECT ep.*, cp.id as card_id
-     FROM event_participants ep
+    `SELECT ep.*, cp.id as card_id FROM event_participants ep
      LEFT JOIN card_profiles cp ON cp.id = ep.card_id
      WHERE ep.event_id = $1 AND ep.user_id = $2`,
     [eventId, userId],
   );
-
   if (!participant?.card_id) return [];
 
-  const userCard = await queryOne(`SELECT * FROM card_profiles WHERE id = $1`, [participant.card_id]);
-  if (!userCard) return [];
+  const userCardRow = await queryOne(`SELECT * FROM card_profiles WHERE id = $1`, [participant.card_id]);
+  if (!userCardRow) return [];
 
-  const card = mapCard(userCard);
+  const card = mapCard(userCardRow);
   await upsertCardEmbedding(card.id, card);
-  const userEmbedding = generateEmbedding(cardToEmbeddingText(card));
+  const { embedding } = await generateEmbedding(cardToEmbeddingText(card));
 
-  const shortlist = await runMatchingPipeline(
-    {
+  const user = await queryOne(`SELECT locale FROM users WHERE id = $1`, [userId]);
+  const locale = (user?.locale as "fr" | "en") ?? "fr";
+  const { agentService } = getAiRuntime(locale);
+
+  const evaluated = await runFullMatchingPipeline({
+    agentService,
+    event_id: eventId,
+    user_id: userId,
+    user_card: card,
+    user_card_id: card.id,
+    user_embedding: embedding,
+    locale,
+    deps: {
       filterCandidates: async (criteria) => {
         const result = await query<{ user_id: string }>(
-          `SELECT ep.user_id
-           FROM event_participants ep
+          `SELECT ep.user_id FROM event_participants ep
            JOIN card_profiles cp ON cp.user_id = ep.user_id AND cp.context_type = 'event' AND cp.context_id = $1
-           WHERE ep.event_id = $1
-             AND ep.user_id != ALL($2::uuid[])
+           WHERE ep.event_id = $1 AND ep.user_id != ALL($2::uuid[])
              AND ($3 = false OR ep.visible_in_event = true)`,
           [criteria.event_id, criteria.exclude_user_ids, criteria.require_visible],
         );
@@ -101,11 +83,9 @@ export async function generateRecommendations(eventId: string, userId: string) {
         const vectorStr = `[${q.embedding.join(",")}]`;
         const result = await query<{ user_id: string; similarity: number }>(
           `SELECT cp.user_id, 1 - (ce.embedding <=> $1::vector) AS similarity
-           FROM card_embeddings ce
-           JOIN card_profiles cp ON cp.id = ce.card_id
+           FROM card_embeddings ce JOIN card_profiles cp ON cp.id = ce.card_id
            WHERE cp.context_type = 'event' AND cp.context_id = $2
-           ORDER BY ce.embedding <=> $1::vector
-           LIMIT $3`,
+           ORDER BY ce.embedding <=> $1::vector LIMIT $3`,
           [vectorStr, eventId, q.limit],
         );
         return result.rows.filter((r) => r.similarity >= q.min_similarity);
@@ -119,9 +99,7 @@ export async function generateRecommendations(eventId: string, userId: string) {
       },
       isAvailable: async (uid, eid) => {
         const row = await queryOne(
-          `SELECT ep.visible_in_event
-           FROM event_participants ep
-           WHERE ep.user_id = $1 AND ep.event_id = $2`,
+          `SELECT ep.visible_in_event FROM event_participants ep WHERE ep.user_id = $1 AND ep.event_id = $2`,
           [uid, eid],
         );
         return Boolean(row?.visible_in_event);
@@ -129,8 +107,7 @@ export async function generateRecommendations(eventId: string, userId: string) {
       sameZone: async (a, b, eid) => {
         const row = await queryOne(
           `SELECT pl_a.zone_id = pl_b.zone_id AS same_zone
-           FROM event_participants ep_a
-           JOIN event_participants ep_b ON ep_b.event_id = ep_a.event_id
+           FROM event_participants ep_a JOIN event_participants ep_b ON ep_b.event_id = ep_a.event_id
            LEFT JOIN participant_locations pl_a ON pl_a.participant_id = ep_a.id
            LEFT JOIN participant_locations pl_b ON pl_b.participant_id = ep_b.id
            WHERE ep_a.user_id = $1 AND ep_b.user_id = $2 AND ep_a.event_id = $3`,
@@ -139,50 +116,18 @@ export async function generateRecommendations(eventId: string, userId: string) {
         return Boolean(row?.same_zone);
       },
     },
-    eventId,
-    userId,
-    card.id,
-    userEmbedding,
-  );
-
-  const user = await queryOne(`SELECT locale FROM users WHERE id = $1`, [userId]);
-  const locale = (user?.locale as "fr" | "en") ?? "fr";
+  });
 
   const recommendations = [];
-  for (const match of shortlist) {
-    const commonInterests = match.card.interests.filter((i) =>
-      card.interests.some((c) => c.toLowerCase() === i.toLowerCase()),
-    );
-    const complementarity = [
-      ...match.card.offering.filter((o) =>
-        card.seeking.some((s) => o.toLowerCase().includes(s.toLowerCase()) || s.toLowerCase().includes(o.toLowerCase())),
-      ),
-    ];
-    const explanation = generateExplanation(locale, commonInterests, complementarity);
-    const opener = generateOpener(locale, explanation.suggested_topic);
-
-    const agentEval = {
-      compatibility_score: match.final_score,
-      shared_intentions: match.card.intentions.filter((i) =>
-        card.intentions.some((c) => c.toLowerCase() === i.toLowerCase()),
-      ),
-      complementarity_notes: complementarity,
-      conversation_topics: commonInterests.slice(0, 3),
-      constraints_checked: true,
-      evaluated_at: new Date().toISOString(),
-    };
-
+  for (const { match, negotiation } of evaluated) {
     const row = await queryOne(
       `INSERT INTO recommendations (
          event_id, user_id, candidate_id, score, compatibility_pct,
          explanation, suggested_opener, agent_evaluation, status
        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
        ON CONFLICT (event_id, user_id, candidate_id)
-       DO UPDATE SET
-         score = EXCLUDED.score,
-         compatibility_pct = EXCLUDED.compatibility_pct,
-         explanation = EXCLUDED.explanation,
-         suggested_opener = EXCLUDED.suggested_opener,
+       DO UPDATE SET score = EXCLUDED.score, compatibility_pct = EXCLUDED.compatibility_pct,
+         explanation = EXCLUDED.explanation, suggested_opener = EXCLUDED.suggested_opener,
          agent_evaluation = EXCLUDED.agent_evaluation,
          status = CASE WHEN recommendations.status = 'dismissed' THEN recommendations.status ELSE 'pending' END
        RETURNING *`,
@@ -191,10 +136,10 @@ export async function generateRecommendations(eventId: string, userId: string) {
         userId,
         match.user_id,
         match.final_score,
-        Math.round(match.final_score * 100),
-        JSON.stringify(explanation),
-        opener,
-        JSON.stringify(agentEval),
+        negotiation.compatibility_pct,
+        JSON.stringify(negotiation.explanation),
+        negotiation.suggested_opener,
+        JSON.stringify(negotiation.evaluation),
       ],
     );
     if (row) recommendations.push(row);
@@ -217,5 +162,3 @@ export function computeCompleteness(card: Partial<CardProfile>): number {
   const filled = fields.filter((f) => (Array.isArray(f) ? f.length > 0 : Boolean(f))).length;
   return Math.round((filled / fields.length) * 100) / 100;
 }
-
-export { toAgentContext };

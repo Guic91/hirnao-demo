@@ -103,9 +103,12 @@ export const api = {
     ),
 
   getRecommendations: (event_id: string) =>
-    request<{ recommendations: RecommendationData[] }>(
+    request<{ recommendations: RecommendationData[]; ai_mode: "llm" | "rule" }>(
       `/matching/recommendations?event_id=${event_id}`,
     ),
+
+  getMatchingStatus: () =>
+    request<{ ai_mode: "llm" | "rule"; pipeline: string }>("/matching/status"),
 
   recommendationAction: (id: string, action: "connect" | "later" | "dismiss") =>
     request(`/matching/recommendations/${id}`, {
@@ -182,6 +185,14 @@ export interface RecommendationData {
   };
   suggested_opener?: string;
   status: string;
+  agent_evaluation?: {
+    compatibility_score: number;
+    shared_intentions: string[];
+    complementarity_notes: string[];
+    conversation_topics: string[];
+    constraints_checked: boolean;
+    evaluated_at: string;
+  };
   candidate: {
     id: string;
     display_name: string;

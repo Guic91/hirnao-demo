@@ -1,8 +1,10 @@
-import type { CardProfile, Connection, Recommendation, User } from "@hirnao/shared";
+import type { CardProfile, Recommendation, User } from "@hirnao/shared";
+import { scoreMatch, toAgentContext } from "@hirnao/ai";
 import { demoStore, isDemoMode } from "./db.js";
 import * as pg from "./db-pg.js";
 import { mapCard, mapEvent, mapRecommendation, mapUser } from "./mappers.js";
 import { generateRecommendations as runMatching } from "./matching-service.js";
+import { getAiRuntime } from "./ai-runtime.js";
 
 export async function findUserById(id: string): Promise<User | null> {
   if (isDemoMode()) return demoStore.getUser(id);
@@ -237,22 +239,26 @@ export async function getRecommendations(userId: string, eventId: string) {
   }));
 }
 
-async function generateDemoRecommendations(userId: string, eventId: string): Promise<Recommendation[]> {
+export async function generateDemoRecommendationsWithAgents(
+  userId: string,
+  eventId: string,
+): Promise<Recommendation[]> {
   const userCard = demoStore.getCard(userId, eventId);
   if (!userCard) return [];
 
-  const { scoreMatch } = await import("@hirnao/ai");
-  const { generateExplanation, generateOpener } = await import("./demo-agent.js");
   const user = demoStore.getUser(userId);
   const locale = user?.locale ?? "fr";
+  const { agentService } = getAiRuntime(locale);
 
   const candidates = demoStore
     .getEventParticipants(eventId, true)
     .filter((p) => p.user?.id !== userId && p.card);
 
   const recs: Recommendation[] = [];
+
   for (const { user: candidate, card } of candidates) {
     if (!card || !candidate) continue;
+
     const scoring = scoreMatch({
       user_card: userCard,
       candidate_card: card,
@@ -261,32 +267,36 @@ async function generateDemoRecommendations(userId: string, eventId: string): Pro
       both_available: true,
     });
 
-    const commonInterests = card.interests.filter((i) =>
-      userCard.interests.some((c) => c.toLowerCase() === i.toLowerCase()),
-    );
-    const complementarity = card.offering.filter((o) =>
-      userCard.seeking.some((s) => o.toLowerCase().includes(s.toLowerCase())),
-    );
-    const explanation = generateExplanation(locale, commonInterests, complementarity);
+    const negotiation = await agentService.negotiate({
+      agent_a: toAgentContext(userCard),
+      agent_b: toAgentContext(card),
+      event_id: eventId,
+    });
 
-    const rec: Recommendation = {
+    if (!negotiation.compatible && negotiation.compatibility_pct < 30) continue;
+
+    recs.push({
       id: crypto.randomUUID(),
       event_id: eventId,
       user_id: userId,
       candidate_id: candidate.id,
-      score: scoring.score,
-      compatibility_pct: scoring.compatibility_pct,
-      explanation,
-      suggested_opener: generateOpener(locale, explanation.suggested_topic),
+      score: Math.max(scoring.score, negotiation.evaluation.compatibility_score),
+      compatibility_pct: negotiation.compatibility_pct,
+      explanation: negotiation.explanation,
+      suggested_opener: negotiation.suggested_opener,
+      agent_evaluation: negotiation.evaluation,
       status: "pending",
       created_at: new Date().toISOString(),
-    };
-    recs.push(rec);
+    });
   }
 
-  recs.sort((a, b) => b.score - a.score);
+  recs.sort((a, b) => b.compatibility_pct - a.compatibility_pct);
   demoStore.setRecommendations(recs.slice(0, 5));
   return recs.slice(0, 5);
+}
+
+async function generateDemoRecommendations(userId: string, eventId: string): Promise<Recommendation[]> {
+  return generateDemoRecommendationsWithAgents(userId, eventId);
 }
 
 export async function updateRecommendationStatus(id: string, userId: string, status: string) {

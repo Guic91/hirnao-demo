@@ -46,6 +46,10 @@ const translations = {
     goToDiscover: "Voir mes recommandations",
     viewCard: "Voir ma Card ID",
     language: "Langue",
+    agentEvaluation: "Évaluation agent↔agent",
+    conversationTopics: "Sujets de conversation",
+    aiModeRule: "Mode règles (démo)",
+    aiModeLlm: "Mode IA (LLM)",
   },
   en: {
     appName: "HIRNAO",
@@ -92,6 +96,10 @@ const translations = {
     goToDiscover: "See my recommendations",
     viewCard: "View my Card ID",
     language: "Language",
+    agentEvaluation: "Agent↔agent evaluation",
+    conversationTopics: "Conversation topics",
+    aiModeRule: "Rule-based (demo)",
+    aiModeLlm: "AI mode (LLM)",
   },
 } as const;
 

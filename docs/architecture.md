@@ -359,6 +359,6 @@ OPENAI_API_KEY=sk-...
 | # | Étape | Priorité |
 |---|-------|----------|
 | 2 | Parcours participant (QR → agent → Card → reco) | Haute |
-| 3 | Moteur matching complet + agent LLM | Haute |
+| 3 | Moteur matching complet + agent LLM | ✅ Fait |
 | 4 | Espace organisateur + KPIs | Moyenne |
 | 5 | Back-office admin | Basse |

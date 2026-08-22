@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api, type RecommendationData } from "@/lib/api";
@@ -13,6 +12,7 @@ export default function DiscoverPage() {
   const { locale } = useApp();
   const [eventId, setEventId] = useState<string>();
   const [recommendations, setRecommendations] = useState<RecommendationData[]>([]);
+  const [aiMode, setAiMode] = useState<"llm" | "rule">("rule");
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -21,6 +21,7 @@ export default function DiscoverPage() {
     try {
       const res = await api.getRecommendations(eid);
       setRecommendations(res.recommendations);
+      setAiMode(res.ai_mode);
     } catch (err) {
       console.error(err);
     } finally {
@@ -53,7 +54,12 @@ export default function DiscoverPage() {
   return (
     <div className="container page-content">
       <header className="header">
-        <h1 style={{ fontSize: 20, fontWeight: 800 }}>{t(locale, "recommendations")}</h1>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 800 }}>{t(locale, "recommendations")}</h1>
+          <span className="tag" style={{ marginTop: 4, fontSize: 10 }}>
+            {aiMode === "llm" ? t(locale, "aiModeLlm") : t(locale, "aiModeRule")}
+          </span>
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
             {visible ? t(locale, "visible") : t(locale, "hidden")}
@@ -93,6 +99,27 @@ export default function DiscoverPage() {
                   ))}
                 </ul>
               </div>
+
+              {rec.agent_evaluation && (
+                <div style={{ marginBottom: 12, padding: 12, background: "var(--accent-soft)", borderRadius: 8 }}>
+                  <p className="label">{t(locale, "agentEvaluation")}</p>
+                  {rec.agent_evaluation.conversation_topics.length > 0 && (
+                    <div style={{ marginTop: 6 }}>
+                      <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{t(locale, "conversationTopics")}: </span>
+                      <div className="tag-list" style={{ marginTop: 4 }}>
+                        {rec.agent_evaluation.conversation_topics.map((topic) => (
+                          <span key={topic} className="tag">{topic}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {rec.agent_evaluation.complementarity_notes.length > 0 && (
+                    <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 8 }}>
+                      {rec.agent_evaluation.complementarity_notes.join(" · ")}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {rec.explanation.common_interests.length > 0 && (
                 <div className="tag-list" style={{ marginBottom: 12 }}>
