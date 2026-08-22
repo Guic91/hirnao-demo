@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge, Avatar } from "@/components/shared";
 import { useApp } from "@/lib/store";
 import { formatDateFr, formatTimeFr } from "@/lib/utils";
+import { downloadICS } from "@/lib/ics";
 
 export default function ConfirmedPlanPage({
   params,
@@ -33,7 +34,18 @@ export default function ConfirmedPlanPage({
     : null;
 
   const handleDownloadICS = () => {
-    window.open(`/api/ics/${id}`, "_blank");
+    downloadICS({
+      id: plan.id,
+      title: plan.title,
+      activity: plan.activity,
+      description: plan.description,
+      date_start: plan.date_start,
+      time_window_start: plan.time_window_start,
+      duration_minutes: plan.duration_minutes,
+      location_area: plan.location_area,
+      confirmed_slot: plan.confirmed_slot,
+      confirmed_venue: plan.confirmed_venue,
+    });
   };
 
   const handleShare = async () => {

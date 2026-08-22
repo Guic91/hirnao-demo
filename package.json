@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "tunnel": "bash scripts/tunnel.sh cloudflared",
+    "urls": "bash scripts/urls.sh",
+    "build:static": "STATIC_EXPORT=true next build",
+    "deploy:surge": "npm run build:static && npx surge out --domain hirnao-app.surge.sh"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.2.6",
