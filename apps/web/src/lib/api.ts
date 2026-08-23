@@ -1,4 +1,5 @@
-import { demoApi, isClientDemoMode } from "./demo/client";
+import { isClientDemoMode } from "./demo/mode";
+import { demoApi } from "./demo/client";
 import { getStoredUser, setStoredUser, setToken, clearToken, getToken } from "./session";
 
 export { getStoredUser, setStoredUser, setToken, clearToken, getToken };
@@ -179,7 +180,20 @@ const liveApi = {
     request<{ logs: AdminAuditLog[] }>("/admin/audit-logs"),
 };
 
-export const api = isClientDemoMode() ? demoApi : liveApi;
+type ApiClient = typeof liveApi;
+
+function resolveApi(): ApiClient {
+  return (isClientDemoMode() ? demoApi : liveApi) as ApiClient;
+}
+
+export const api: ApiClient = new Proxy({} as ApiClient, {
+  get(_target, prop: string) {
+    const impl = resolveApi() as Record<string, unknown>;
+    const value = impl[prop];
+    if (typeof value === "function") return (...args: unknown[]) => (value as (...a: unknown[]) => unknown).apply(impl, args);
+    return value;
+  },
+});
 
 export interface UserData {
   id: string;

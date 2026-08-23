@@ -95,10 +95,12 @@ function saveState(state: PersistedState) {
 
 let state = defaultState();
 
+function normalizeSlug(slug: string) {
+  return decodeURIComponent(slug).replace(/\/$/, "").trim();
+}
+
 function ensureClientState() {
-  if (typeof window !== "undefined" && state.users.length === SEED_USERS.length && !localStorage.getItem(STORAGE_KEY)) {
-    state = loadState();
-  } else if (typeof window !== "undefined") {
+  if (typeof window !== "undefined") {
     state = loadState();
   }
 }
@@ -244,7 +246,10 @@ const DEMO_REPORTS: AdminReport[] = [
 export const demoApi = {
   getEvent: async (slug: string) => {
     ensureClientState();
-    if (slug !== DEMO_EVENT.slug) throw new Error("Event not found");
+    const normalized = normalizeSlug(slug);
+    if (normalized !== DEMO_EVENT.slug) {
+      throw new Error(`Événement introuvable : ${normalized}`);
+    }
     return { event: DEMO_EVENT as EventData };
   },
 
@@ -274,7 +279,7 @@ export const demoApi = {
   joinEvent: async (slug: string) => {
     ensureClientState();
     const user = requireUser();
-    if (slug !== DEMO_EVENT.slug) throw new Error("Event not found");
+    if (normalizeSlug(slug) !== DEMO_EVENT.slug) throw new Error("Event not found");
     const exists = state.participants.find((p) => p.event_id === EVENT_ID && p.user_id === user.id);
     if (!exists) {
       state.participants.push({
@@ -548,7 +553,3 @@ export const demoApi = {
     ],
   }),
 };
-
-export function isClientDemoMode(): boolean {
-  return process.env.NEXT_PUBLIC_DEMO_MODE === "true";
-}

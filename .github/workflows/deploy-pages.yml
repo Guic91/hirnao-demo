@@ -24,7 +24,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: BASE_PATH=/hirnao-demo STATIC_EXPORT=true npm run build:pages
+      - run: BASE_PATH=/hirnao-demo STATIC_EXPORT=true NEXT_PUBLIC_DEMO_MODE=true npm run build:pages
       - uses: actions/upload-pages-artifact@v3
         with:
           path: out

@@ -18,7 +18,7 @@ export default function EventPage() {
   }, [slug]);
 
   if (loading) return <div className="container page-content"><p style={{ paddingTop: 40 }}>{t(locale, "loading")}</p></div>;
-  if (!event) return <div className="container page-content"><p style={{ paddingTop: 40 }}>Event not found</p></div>;
+  if (!event) return <div className="container page-content"><p style={{ paddingTop: 40 }}>{t(locale, "eventNotFound")}</p></div>;
 
   const startDate = new Date(event.starts_at);
 
