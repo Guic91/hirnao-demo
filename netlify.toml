@@ -1,19 +1,18 @@
-# Netlify — static PWA frontend (monorepo apps/web)
-# API is deployed separately; set API_URL in Netlify env for /api proxy if needed.
+# HIRNAO — déploiement Netlify (export statique, SANS plugin Next.js)
+#
+# Ce site est une PWA statique (output: export). Ne pas utiliser @netlify/plugin-nextjs.
+# Dans Netlify UI → Plugins : supprimer "@netlify/plugin-nextjs" si installé.
+# Dans Netlify UI → Build settings : laisser netlify.toml gérer command + publish.
 
 [build]
-  command = "STATIC_EXPORT=true npm run build:pages"
+  command = "npm run build:netlify"
   publish = "out"
 
 [build.environment]
   NODE_VERSION = "24"
-
-# Optional: proxy API calls to a hosted backend (uncomment and set API_URL in Netlify UI)
-# [[redirects]]
-#   from = "/api/*"
-#   to = ":api_url/:splat"
-#   status = 200
-#   force = true
+  STATIC_EXPORT = "true"
+  # Empêche Netlify d'auto-installer @netlify/plugin-nextjs
+  NETLIFY_NEXT_PLUGIN_SKIP = "true"
 
 [[headers]]
   for = "/manifest.json"
