@@ -17,12 +17,19 @@ import { adminRoutes } from "./routes/admin.js";
 const PORT = Number(process.env.PORT ?? 3001);
 const HOST = process.env.HOST ?? "0.0.0.0";
 
+function getCorsConfig() {
+  const raw = process.env.CORS_ORIGINS;
+  if (!raw) return { origin: true };
+  const allowed = raw.split(",").map((o) => o.trim()).filter(Boolean);
+  return { origin: allowed.length ? allowed : true };
+}
+
 export async function buildApp() {
   const app = Fastify({
     logger: true,
   });
 
-  await app.register(cors, { origin: true });
+  await app.register(cors, getCorsConfig());
   await app.register(jwt, {
     secret: process.env.JWT_SECRET ?? "hirnao-dev-secret-change-in-prod",
   });

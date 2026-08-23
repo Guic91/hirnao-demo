@@ -30,6 +30,7 @@ jobs:
         env:
           STATIC_EXPORT: "true"
           NEXT_PUBLIC_DEMO_MODE: "true"
+          NEXT_PUBLIC_API_URL: ${{ secrets.SANDBOX_API_URL }}
 
       - name: Publish to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3

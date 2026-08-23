@@ -1,0 +1,29 @@
+# HIRNAO API — image sandbox OVH
+FROM node:24-alpine AS base
+WORKDIR /app
+RUN apk add --no-cache libc6-compat
+
+# Install dependencies (monorepo workspaces)
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/
+COPY packages/shared/package.json packages/shared/
+COPY packages/ai/package.json packages/ai/
+COPY packages/db/package.json packages/db/
+RUN npm ci --workspace=@hirnao/api --omit=dev
+
+# Application source
+COPY packages/shared packages/shared
+COPY packages/ai packages/ai
+COPY packages/db packages/db
+COPY apps/api apps/api
+
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=3001
+
+EXPOSE 3001
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:3001/health || exit 1
+
+CMD ["npx", "tsx", "apps/api/src/server.ts"]
