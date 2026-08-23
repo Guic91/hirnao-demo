@@ -132,6 +132,35 @@ export const api = {
     request<{ connections: ConnectionData[] }>(
       `/connections${event_id ? `?event_id=${event_id}` : ""}`,
     ),
+
+  // Organizer
+  organizerLogin: (email: string) =>
+    request<{ user: UserData; token: string }>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
+  listOrganizerEvents: () =>
+    request<{ events: EventData[] }>("/organizer/events"),
+
+  getEventKpis: (eventId: string) =>
+    request<{ event: { id: string; title: string; status: string }; kpis: EventKPIs }>(
+      `/organizer/events/${eventId}/kpis`,
+    ),
+
+  getEventQr: (eventId: string) =>
+    request<{ access: { slug: string; qr_token: string; access_url: string; qr_url: string } }>(
+      `/organizer/events/${eventId}/qr`,
+    ),
+
+  getOrganizerParticipants: (eventId: string) =>
+    request<{ participants: OrganizerParticipant[] }>(`/organizer/events/${eventId}/participants`),
+
+  createEvent: (body: CreateEventInput) =>
+    request<{ event: EventData }>("/organizer/events", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };
 
 export interface UserData {
@@ -139,6 +168,7 @@ export interface UserData {
   email: string;
   display_name: string;
   locale: "fr" | "en";
+  role?: "participant" | "organizer" | "admin";
 }
 
 export interface EventData {
@@ -209,4 +239,42 @@ export interface ConnectionData {
   requester_name: string;
   recipient_name: string;
   message?: string;
+}
+
+export interface EventKPIs {
+  event_id: string;
+  participants: number;
+  activation_rate: number;
+  recommendations_generated: number;
+  recommendations_opened: number;
+  connections_sent: number;
+  acceptance_rate: number;
+  meeting_rate: number;
+  relevance_positive_rate: number;
+  return_rate: number;
+}
+
+export interface OrganizerParticipant {
+  id: string;
+  user_id: string;
+  display_name: string;
+  email: string;
+  status: string;
+  visible_in_event: boolean;
+  headline?: string;
+  activity?: string;
+  completeness_score: number;
+  recommendations_count: number;
+  connections_count: number;
+  checked_in_at?: string;
+  created_at: string;
+}
+
+export interface CreateEventInput {
+  title: string;
+  description?: string;
+  venue_name?: string;
+  starts_at: string;
+  ends_at: string;
+  default_locale?: "fr" | "en";
 }

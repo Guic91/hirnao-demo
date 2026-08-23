@@ -13,6 +13,9 @@ export default function HomePage() {
         <Link href="/e/ai-summit-paris-2026" className="btn btn-primary">
           Demo — AI Summit Paris 2026
         </Link>
+        <Link href="/organizer" className="btn btn-secondary">
+          Espace organisateur
+        </Link>
         <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
           Scan QR or open event link to start
         </p>

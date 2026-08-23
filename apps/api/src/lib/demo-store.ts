@@ -149,6 +149,7 @@ class DemoStore {
   users = new Map(demoUsers.map((u) => [u.id, { ...u }]));
   usersByEmail = new Map(demoUsers.map((u) => [u.email, u.id]));
   cards = new Map(demoCards.map((c) => [c.id, { ...c }]));
+  events = new Map([[demoEvent.id, { ...demoEvent }]]);
   participants = new Map<string, Participant>();
   recommendations = new Map<string, Recommendation & { candidate_name?: string; candidate_headline?: string; candidate_activity?: string }>();
   connections = new Map<string, Connection & { requester_name?: string; recipient_name?: string }>();
@@ -201,7 +202,103 @@ class DemoStore {
   }
 
   getEventBySlug(slug: string) {
-    return slug === demoEvent.slug ? demoEvent : null;
+    return [...this.events.values()].find((e) => e.slug === slug) ?? null;
+  }
+
+  getEventById(id: string) {
+    return this.events.get(id) ?? null;
+  }
+
+  listEventsByOrganizer(organizerId: string) {
+    return [...this.events.values()].filter((e) => e.organizer_id === organizerId);
+  }
+
+  createEvent(
+    organizerId: string,
+    data: {
+      title: string;
+      description?: string;
+      venue_name?: string;
+      venue_address?: string;
+      starts_at: string;
+      ends_at: string;
+      default_locale: "fr" | "en";
+      supported_locales: ("fr" | "en")[];
+      settings: Record<string, unknown>;
+      slug: string;
+      qr_code_token: string;
+    },
+  ) {
+    const event = {
+      id: this.nextId(),
+      organizer_id: organizerId,
+      slug: data.slug,
+      title: data.title,
+      description: data.description,
+      venue_name: data.venue_name,
+      venue_address: data.venue_address ?? null,
+      starts_at: data.starts_at,
+      ends_at: data.ends_at,
+      status: "draft" as const,
+      default_locale: data.default_locale,
+      supported_locales: data.supported_locales,
+      qr_code_token: data.qr_code_token,
+      access_url: null,
+      settings: data.settings,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    this.events.set(event.id, event);
+    return event;
+  }
+
+  updateEvent(eventId: string, data: Record<string, unknown>) {
+    const event = this.events.get(eventId);
+    if (!event) return null;
+    Object.assign(event, data, { updated_at: new Date().toISOString() });
+    return event;
+  }
+
+  getKpiRawData(eventId: string) {
+    const participants = [...this.participants.values()].filter((p) => p.event_id === eventId);
+    const activated = participants.filter((p) => p.card_id).length;
+    const recs = [...this.recommendations.values()].filter((r) => r.event_id === eventId);
+    const conns = [...this.connections.values()].filter((c) => c.event_id === eventId);
+
+    return {
+      participants: participants.length,
+      activated,
+      recommendations_generated: recs.length,
+      recommendations_opened: recs.filter((r) => ["shown", "interested"].includes(r.status)).length,
+      connections_sent: conns.length,
+      connections_accepted: conns.filter((c) => c.status === "accepted").length,
+      meetings_met: 0,
+      feedback_positive: 0,
+      feedback_total: 0,
+      returning_users: 0,
+    };
+  }
+
+  getOrganizerParticipants(eventId: string) {
+    return this.getEventParticipants(eventId).map(({ user, card, participant }) => ({
+      id: participant.id,
+      status: participant.status,
+      visible_in_event: participant.visible_in_event,
+      checked_in_at: participant.checked_in_at,
+      created_at: participant.created_at,
+      user_id: user?.id,
+      display_name: user?.display_name,
+      email: user?.email,
+      headline: card?.headline,
+      activity: card?.activity,
+      completeness_score: card?.completeness_score ?? 0,
+      recommendations_count: [...this.recommendations.values()].filter(
+        (r) => r.event_id === eventId && r.user_id === user?.id,
+      ).length,
+      connections_count: [...this.connections.values()].filter(
+        (c) => c.event_id === eventId && (c.requester_id === user?.id || c.recipient_id === user?.id),
+      ).length,
+    }));
   }
 
   joinEvent(eventId: string, userId: string) {
