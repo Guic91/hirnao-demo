@@ -161,6 +161,37 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  // Admin
+  adminLogin: (email: string) =>
+    request<{ user: UserData; token: string }>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
+  getAdminStats: () =>
+    request<{ stats: AdminStats }>("/admin/stats"),
+
+  getAdminUsers: () =>
+    request<{ users: UserData[]; total: number }>("/admin/users"),
+
+  getAdminEvents: () =>
+    request<{ events: AdminEventData[]; total: number }>("/admin/events"),
+
+  getAdminReports: () =>
+    request<{ reports: AdminReport[] }>("/admin/reports"),
+
+  updateAdminReport: (id: string, status: string) =>
+    request(`/admin/reports/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
+
+  getAdminAiUsage: () =>
+    request<{ mode: string; total_calls: number; recent: unknown[] }>("/admin/ai-usage"),
+
+  getAdminAuditLogs: () =>
+    request<{ logs: AdminAuditLog[] }>("/admin/audit-logs"),
 };
 
 export interface UserData {
@@ -277,4 +308,40 @@ export interface CreateEventInput {
   starts_at: string;
   ends_at: string;
   default_locale?: "fr" | "en";
+}
+
+export interface AdminStats {
+  users: number;
+  events: number;
+  participants: number;
+  recommendations: number;
+  connections: number;
+  reports_open: number;
+  ai_calls: number;
+}
+
+export interface AdminEventData extends EventData {
+  organizer_name?: string;
+  participant_count?: number;
+}
+
+export interface AdminReport {
+  id: string;
+  reporter_id: string;
+  reported_user_id: string;
+  reason: string;
+  status: string;
+  created_at: string;
+  reporter_name?: string;
+  reported_name?: string;
+}
+
+export interface AdminAuditLog {
+  id: string;
+  actor_id: string | null;
+  action: string;
+  resource: string;
+  resource_id?: string;
+  created_at: string;
+  actor_name?: string;
 }

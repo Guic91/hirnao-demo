@@ -11,6 +11,7 @@ declare module "fastify" {
   interface FastifyInstance {
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
     requireOrganizer: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    requireAdmin: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
   interface FastifyRequest {
     userId: string;
@@ -33,13 +34,21 @@ export function registerAuth(app: FastifyInstance) {
     await app.authenticate(request, reply);
     if (reply.sent) return;
     if (!["organizer", "admin"].includes(request.userRole ?? "")) {
-      return sendForbidden(reply);
+      return sendForbidden(reply, "Organizer access required");
+    }
+  });
+
+  app.decorate("requireAdmin", async (request: FastifyRequest, reply: FastifyReply) => {
+    await app.authenticate(request, reply);
+    if (reply.sent) return;
+    if (request.userRole !== "admin") {
+      return sendForbidden(reply, "Admin access required");
     }
   });
 }
 
-function sendForbidden(reply: FastifyReply) {
-  return reply.status(403).send({ code: "forbidden", message: "Organizer access required" });
+function sendForbidden(reply: FastifyReply, message = "Forbidden") {
+  return reply.status(403).send({ code: "forbidden", message });
 }
 
 export function signToken(app: FastifyInstance, user: { id: string; email: string; role: string }) {

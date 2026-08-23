@@ -16,6 +16,9 @@ export default function HomePage() {
         <Link href="/organizer" className="btn btn-secondary">
           Espace organisateur
         </Link>
+        <Link href="/admin" className="btn btn-ghost">
+          Admin
+        </Link>
         <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
           Scan QR or open event link to start
         </p>

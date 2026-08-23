@@ -41,6 +41,20 @@ npm run dev:web      # PWA sur :3000
 
 Sans Docker, l'API démarre en **mode démo** (`DEMO_MODE=true`) avec données en mémoire.
 
+### Espace organisateur (Step 4)
+
+- Login : `organizer@hirnao.app` → `/organizer`
+- Dashboard KPIs : participants, activation, recommandations, connexions, rencontres
+- Liste participants (sans données privées)
+- Lien d'accès + QR token pour l'événement
+
+### Back-office admin (Step 5)
+
+- Login : `admin@hirnao.app` → `/admin`
+- Dashboard stats globales
+- Gestion utilisateurs, événements, signalements
+- Monitoring usage IA + audit logs
+
 ### Parcours participant (MVP)
 
 1. Ouvrir `/e/ai-summit-paris-2026` — accès événement via QR/slug

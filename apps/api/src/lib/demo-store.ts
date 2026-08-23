@@ -2,8 +2,19 @@ import type { CardProfile, Connection, Recommendation, User } from "@hirnao/shar
 
 const EVENT_ID = "10000000-0000-0000-0000-000000000001";
 const ORGANIZER_ID = "00000000-0000-0000-0000-000000000001";
+const ADMIN_ID = "00000000-0000-0000-0000-000000000099";
 
 export const demoUsers: User[] = [
+  {
+    id: ADMIN_ID,
+    email: "admin@hirnao.app",
+    display_name: "Admin Hirnao",
+    locale: "fr",
+    role: "admin",
+    email_verified: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
   {
     id: ORGANIZER_ID,
     email: "organizer@hirnao.app",
@@ -153,6 +164,8 @@ class DemoStore {
   participants = new Map<string, Participant>();
   recommendations = new Map<string, Recommendation & { candidate_name?: string; candidate_headline?: string; candidate_activity?: string }>();
   connections = new Map<string, Connection & { requester_name?: string; recipient_name?: string }>();
+  reports = new Map<string, { id: string; reporter_id: string; reported_user_id: string; event_id?: string; reason: string; status: string; created_at: string; reporter_name?: string; reported_name?: string }>();
+  auditLogs: Array<{ id: string; actor_id: string | null; action: string; resource: string; resource_id?: string; metadata?: Record<string, unknown>; created_at: string; actor_name?: string }> = [];
   onboardingSessions = new Map<string, { step: number; exchanges: unknown[]; collected: Record<string, unknown> }>();
 
   constructor() {
@@ -169,6 +182,20 @@ class DemoStore {
         created_at: new Date().toISOString(),
       });
     }
+
+    this.reports.set("r-demo-1", {
+      id: "r-demo-1",
+      reporter_id: "00000000-0000-0000-0000-000000000002",
+      reported_user_id: "00000000-0000-0000-0000-000000000004",
+      event_id: EVENT_ID,
+      reason: "Comportement inapproprié lors d'une connexion",
+      status: "open",
+      created_at: new Date().toISOString(),
+      reporter_name: "Sophie Martin",
+      reported_name: "Lucas Dubois",
+    });
+
+    this.addAuditLog({ actor_id: ADMIN_ID, action: "login", resource: "admin", metadata: { source: "demo" } });
   }
 
   nextId() {
@@ -414,6 +441,61 @@ class DemoStore {
     };
     this.connections.set(id, conn);
     return conn;
+  }
+
+  listAllUsers(limit: number, offset: number) {
+    const users = [...this.users.values()].sort((a, b) => b.created_at.localeCompare(a.created_at));
+    return { users: users.slice(offset, offset + limit), total: users.length };
+  }
+
+  listAllEvents(limit: number, offset: number) {
+    const events = [...this.events.values()]
+      .sort((a, b) => b.starts_at.localeCompare(a.starts_at))
+      .slice(offset, offset + limit)
+      .map((e) => ({
+        ...e,
+        organizer_name: this.users.get(e.organizer_id)?.display_name,
+        participant_count: [...this.participants.values()].filter((p) => p.event_id === e.id).length,
+      }));
+    return { events, total: this.events.size };
+  }
+
+  listReports(status?: string) {
+    return [...this.reports.values()].filter((r) => !status || r.status === status);
+  }
+
+  updateReport(id: string, status: string) {
+    const report = this.reports.get(id);
+    if (!report) return null;
+    report.status = status;
+    return report;
+  }
+
+  getAdminStats() {
+    return {
+      users: this.users.size,
+      events: this.events.size,
+      participants: this.participants.size,
+      recommendations: this.recommendations.size,
+      connections: this.connections.size,
+      reports_open: [...this.reports.values()].filter((r) => r.status === "open").length,
+      ai_calls: 0,
+    };
+  }
+
+  addAuditLog(data: { actor_id: string | null; action: string; resource: string; resource_id?: string; metadata?: Record<string, unknown> }) {
+    const log = {
+      id: this.nextId(),
+      ...data,
+      created_at: new Date().toISOString(),
+      actor_name: data.actor_id ? this.users.get(data.actor_id)?.display_name : undefined,
+    };
+    this.auditLogs.unshift(log);
+    return log;
+  }
+
+  getAuditLogs(limit: number) {
+    return this.auditLogs.slice(0, limit);
   }
 }
 
