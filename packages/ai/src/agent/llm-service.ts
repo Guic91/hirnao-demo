@@ -54,10 +54,14 @@ export interface LlmUsageCallback {
   }): void | Promise<void>;
 }
 
+export interface ExtendedAgentService extends AgentService {
+  chatOnboarding?(exchanges: OnboardingExchange[], userMessage: string, locale: "fr" | "en"): Promise<string>;
+}
+
 export function createLlmAgentService(
   locale: "fr" | "en",
   onUsage?: LlmUsageCallback,
-): AgentService {
+): ExtendedAgentService {
   const fallback = createRuleAgentService(locale);
 
   async function track(operation: string, model: string, input: number, output: number, metadata?: Record<string, unknown>) {
@@ -159,8 +163,4 @@ export function createLlmAgentService(
       return result.content;
     },
   };
-}
-
-export interface ExtendedAgentService extends AgentService {
-  chatOnboarding?(exchanges: OnboardingExchange[], userMessage: string, locale: "fr" | "en"): Promise<string>;
 }

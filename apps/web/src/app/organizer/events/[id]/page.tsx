@@ -7,7 +7,7 @@ import { api, type EventKPIs } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
 
-const KPI_KEYS: (keyof EventKPIs)[] = [
+const KPI_KEYS = [
   "participants",
   "activation_rate",
   "recommendations_generated",
@@ -17,9 +17,11 @@ const KPI_KEYS: (keyof EventKPIs)[] = [
   "meeting_rate",
   "relevance_positive_rate",
   "return_rate",
-];
+] as const;
 
-const KPI_LABELS: Record<string, { fr: string; en: string }> = {
+type NumericKpiKey = (typeof KPI_KEYS)[number];
+
+const KPI_LABELS: Record<NumericKpiKey, { fr: string; en: string }> = {
   participants: { fr: "Participants", en: "Participants" },
   activation_rate: { fr: "Activation", en: "Activation" },
   recommendations_generated: { fr: "Recommandations", en: "Recommendations" },
@@ -31,7 +33,7 @@ const KPI_LABELS: Record<string, { fr: string; en: string }> = {
   return_rate: { fr: "Retour", en: "Return" },
 };
 
-function formatKpi(key: keyof EventKPIs, value: number): string {
+function formatKpi(key: NumericKpiKey, value: number): string {
   if (key === "participants" || key === "recommendations_generated" || key === "recommendations_opened" || key === "connections_sent") {
     return String(value);
   }

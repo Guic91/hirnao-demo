@@ -1,4 +1,4 @@
-import type { CardProfile, Connection, Recommendation, User } from "@hirnao/shared";
+import type { CardProfile, Connection, Event, EventSettings, Recommendation, User } from "@hirnao/shared";
 
 const EVENT_ID = "10000000-0000-0000-0000-000000000001";
 const ORGANIZER_ID = "00000000-0000-0000-0000-000000000001";
@@ -57,21 +57,20 @@ export const demoUsers: User[] = [
   },
 ];
 
-export const demoEvent = {
+export const demoEvent: Event = {
   id: EVENT_ID,
   organizer_id: ORGANIZER_ID,
   slug: "ai-summit-paris-2026",
   title: "AI Summit Paris 2026",
   description: "Conférence sur l'IA appliquée à l'événementiel et au networking.",
   venue_name: "Station F",
-  venue_address: null,
   starts_at: new Date(Date.now() + 86400000).toISOString(),
   ends_at: new Date(Date.now() + 86400000 + 28800000).toISOString(),
   status: "published",
-  default_locale: "fr" as const,
-  supported_locales: ["fr", "en"] as const,
+  default_locale: "fr",
+  supported_locales: ["fr", "en"],
   qr_code_token: "demo-qr-ai-summit-2026",
-  access_url: null,
+  access_url: "",
   settings: {
     require_approval: false,
     geolocation_zones_enabled: true,
@@ -160,7 +159,7 @@ class DemoStore {
   users = new Map(demoUsers.map((u) => [u.id, { ...u }]));
   usersByEmail = new Map(demoUsers.map((u) => [u.email, u.id]));
   cards = new Map(demoCards.map((c) => [c.id, { ...c }]));
-  events = new Map([[demoEvent.id, { ...demoEvent }]]);
+  events = new Map<string, Event>([[demoEvent.id, { ...demoEvent }]]);
   participants = new Map<string, Participant>();
   recommendations = new Map<string, Recommendation & { candidate_name?: string; candidate_headline?: string; candidate_activity?: string }>();
   connections = new Map<string, Connection & { requester_name?: string; recipient_name?: string }>();
@@ -232,7 +231,7 @@ class DemoStore {
     return [...this.events.values()].find((e) => e.slug === slug) ?? null;
   }
 
-  getEventById(id: string) {
+  getEventById(id: string): Event | null {
     return this.events.get(id) ?? null;
   }
 
@@ -256,22 +255,28 @@ class DemoStore {
       qr_code_token: string;
     },
   ) {
-    const event = {
+    const event: Event = {
       id: this.nextId(),
       organizer_id: organizerId,
       slug: data.slug,
       title: data.title,
       description: data.description,
       venue_name: data.venue_name,
-      venue_address: data.venue_address ?? null,
+      venue_address: data.venue_address,
       starts_at: data.starts_at,
       ends_at: data.ends_at,
-      status: "draft" as const,
+      status: "draft",
       default_locale: data.default_locale,
       supported_locales: data.supported_locales,
       qr_code_token: data.qr_code_token,
-      access_url: null,
-      settings: data.settings,
+      access_url: "",
+      settings: {
+        require_approval: false,
+        geolocation_zones_enabled: true,
+        agent_matching_enabled: true,
+        auto_expire_visibility: true,
+        ...(data.settings as Partial<EventSettings>),
+      },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };

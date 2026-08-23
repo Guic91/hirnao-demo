@@ -29,7 +29,7 @@ export function mapEvent(row: Record<string, unknown>): Event {
     default_locale: row.default_locale as Event["default_locale"],
     supported_locales: (row.supported_locales as Event["supported_locales"]) ?? ["fr", "en"],
     qr_code_token: String(row.qr_code_token),
-    access_url: row.access_url ? String(row.access_url) : undefined,
+    access_url: row.access_url != null ? String(row.access_url) : "",
     settings: (row.settings as Event["settings"]) ?? {
       require_approval: false,
       geolocation_zones_enabled: true,

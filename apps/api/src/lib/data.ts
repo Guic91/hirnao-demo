@@ -321,7 +321,11 @@ export async function createConnection(data: {
   recommendation_id?: string;
 }) {
   if (isDemoMode()) {
-    return demoStore.addConnection({ ...data, status: "pending" });
+    return demoStore.addConnection({
+      ...data,
+      status: "pending",
+      event_id: data.event_id ?? undefined,
+    });
   }
   return pg.queryOne(
     `INSERT INTO connections (event_id, requester_id, recipient_id, message, recommendation_id, status)

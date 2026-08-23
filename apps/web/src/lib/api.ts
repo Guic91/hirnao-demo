@@ -188,7 +188,7 @@ export const api = {
     }),
 
   getAdminAiUsage: () =>
-    request<{ mode: string; total_calls: number; recent: unknown[] }>("/admin/ai-usage"),
+    request<AdminAiUsage>("/admin/ai-usage"),
 
   getAdminAuditLogs: () =>
     request<{ logs: AdminAuditLog[] }>("/admin/audit-logs"),
@@ -318,6 +318,18 @@ export interface AdminStats {
   connections: number;
   reports_open: number;
   ai_calls: number;
+}
+
+export interface AdminAiUsage {
+  mode: string;
+  total_calls: number;
+  recent: {
+    operation: string;
+    model: string;
+    input_tokens: number;
+    output_tokens: number;
+    created_at: string;
+  }[];
 }
 
 export interface AdminEventData extends EventData {
