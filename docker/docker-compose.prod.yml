@@ -1,0 +1,56 @@
+# Production OVH via Coolify — pull image depuis Harbor
+# Coolify: New Resource → Docker Compose → repo + ce fichier
+
+services:
+  api:
+    image: ${HARBOR_REGISTRY}/${HARBOR_PROJECT}/api:latest
+    container_name: hirnao-api
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3001
+      NODE_ENV: production
+    expose:
+      - "3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "coolify.managed=true"
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: hirnao-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hirnao}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-hirnao}
+    volumes:
+      - hirnao_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hirnao}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: hirnao-redis
+    restart: unless-stopped
+    volumes:
+      - hirnao_redis:/data
+
+volumes:
+  hirnao_pgdata:
+  hirnao_redis:

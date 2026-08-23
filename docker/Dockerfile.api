@@ -1,7 +1,7 @@
-# HIRNAO API — image sandbox OVH
+# HIRNAO API — image production (Harbor / Coolify / OVH)
 FROM node:24-alpine AS base
 WORKDIR /app
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat wget
 
 # Install dependencies (monorepo workspaces)
 COPY package.json package-lock.json ./

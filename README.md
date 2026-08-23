@@ -7,7 +7,8 @@ Chaque participant dispose d'un **agent IA personnel** qui comprend qui il est, 
 ## Documentation
 
 - [Architecture MVP V1](./docs/architecture.md) — Schéma complet, API, matching, sécurité
-- [Sandbox OVH](./docs/sandbox-ovh.md) — Déployer l'API + back-office sur VPS OVH
+- [Pipeline GitHub → Harbor → Coolify → OVH](./docs/deploy-pipeline.md) — CI/CD production
+- [Sandbox OVH](./docs/sandbox-ovh.md) — Déployer l'API rapidement (Docker direct, sans Harbor)
 
 ## Stack
 
