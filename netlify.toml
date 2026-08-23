@@ -11,6 +11,7 @@
 [build.environment]
   NODE_VERSION = "24"
   STATIC_EXPORT = "true"
+  NEXT_PUBLIC_DEMO_MODE = "true"
   # Empêche Netlify d'auto-installer @netlify/plugin-nextjs
   NETLIFY_NEXT_PLUGIN_SKIP = "true"
 

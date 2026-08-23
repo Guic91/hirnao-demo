@@ -1,4 +1,12 @@
-const API_BASE = "/api/v1";
+import { demoApi, isClientDemoMode } from "./demo/client";
+import { getStoredUser, setStoredUser, setToken, clearToken, getToken } from "./session";
+
+export { getStoredUser, setStoredUser, setToken, clearToken, getToken };
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL
+  ? `${process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "")}/v1`
+  : "/api/v1";
+
 
 export class ApiError extends Error {
   constructor(
@@ -9,29 +17,6 @@ export class ApiError extends Error {
   }
 }
 
-function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("hirnao_token");
-}
-
-export function setToken(token: string) {
-  localStorage.setItem("hirnao_token", token);
-}
-
-export function clearToken() {
-  localStorage.removeItem("hirnao_token");
-  localStorage.removeItem("hirnao_user");
-}
-
-export function getStoredUser<T>(): T | null {
-  if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem("hirnao_user");
-  return raw ? (JSON.parse(raw) as T) : null;
-}
-
-export function setStoredUser(user: unknown) {
-  localStorage.setItem("hirnao_user", JSON.stringify(user));
-}
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
@@ -50,7 +35,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return data as T;
 }
 
-export const api = {
+const liveApi = {
   getEvent: (slug: string) => request<{ event: EventData }>(`/events/${slug}`),
 
   register: (body: { email: string; display_name: string; locale: "fr" | "en" }) =>
@@ -193,6 +178,8 @@ export const api = {
   getAdminAuditLogs: () =>
     request<{ logs: AdminAuditLog[] }>("/admin/audit-logs"),
 };
+
+export const api = isClientDemoMode() ? demoApi : liveApi;
 
 export interface UserData {
   id: string;
