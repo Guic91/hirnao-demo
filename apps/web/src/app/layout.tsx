@@ -2,10 +2,12 @@ import type { Metadata, Viewport } from "next";
 import { AppProvider } from "@/lib/store";
 import "./globals.css";
 
+const basePath = process.env.BASE_PATH ?? "";
+
 export const metadata: Metadata = {
   title: "HIRNAO — Intelligent Networking",
   description: "Personal AI agent for real-world event networking",
-  manifest: "/manifest.json",
+  manifest: `${basePath}/manifest.json`,
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

@@ -11,6 +11,7 @@
     "dev:api": "npm run dev --workspace=@hirnao/api",
     "dev:web": "npm run dev --workspace=@hirnao/web",
     "build": "npm run build --workspaces --if-present",
+    "build:pages": "npm run build --workspace=@hirnao/web && node scripts/copy-pages-out.mjs",
     "db:migrate": "npm run migrate --workspace=@hirnao/db",
     "db:seed": "npm run seed --workspace=@hirnao/db",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
