@@ -103,7 +103,7 @@ Chaque push `main` sur l'API → Harbor → webhook Coolify → redeploy OVH.
 
 | Spec | Minimum |
 |------|---------|
-| VPS | 4 vCPU / 8 Go RAM (API + Postgres + Redis + Coolify) |
+| VPS | 4 vCPU / 8 Go RAM (API + Coolify) |
 | OS | Ubuntu 22.04 LTS |
 | Ports | 22, 80, 443, 8000 (Coolify admin) |
 
@@ -129,15 +129,21 @@ GitHub Secret :
 
 ---
 
-## 5. Migrations base (premier deploy)
+## 5. Firebase (premier deploy)
 
-```bash
-# SSH sur le VPS ou Coolify terminal
-docker exec -it hirnao-api npx tsx packages/db/scripts/migrate.js
-docker exec -it hirnao-api npx tsx packages/db/scripts/seed.js
-```
+1. Créer un projet Firebase + activer Firestore
+2. Générer un compte de service (JSON)
+3. Dans Coolify, définir :
+   - `DB_BACKEND=firebase`
+   - `FIREBASE_PROJECT_ID`
+   - `FIREBASE_SERVICE_ACCOUNT_JSON`
+4. Déployer les règles : `firebase deploy --only firestore:rules,firestore:indexes`
 
-Ou activer `DEMO_MODE=true` temporairement sans Postgres.
+Au premier démarrage, l'API seed automatiquement les données démo si la base est vide.
+
+Voir [firebase-setup.md](./firebase-setup.md).
+
+Pour le dev local sans Firebase : `DEMO_MODE=true`.
 
 ---
 
@@ -173,5 +179,6 @@ Voir [sandbox-ovh.md](./sandbox-ovh.md).
 - [ ] DNS `api-hirnao.*` → VPS
 - [ ] SSL Let's Encrypt (Coolify auto)
 - [ ] `SANDBOX_API_URL` sur Cloudflare build
-- [ ] Migrations PostgreSQL exécutées
+- [ ] Firebase projet + Firestore activé
+- [ ] Variables `FIREBASE_*` dans Coolify
 - [ ] Test admin `admin@hirnao.app` + organisateur `organizer@hirnao.app`

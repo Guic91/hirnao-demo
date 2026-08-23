@@ -2,7 +2,8 @@ import type { Event, EventKPIs } from "@hirnao/shared";
 import { createEventSchema } from "@hirnao/shared";
 import { z } from "zod";
 import { demoStore } from "./demo-store.js";
-import { isDemoMode } from "./db.js";
+import { isDemoMode, isFirebaseMode } from "./db.js";
+import { firestoreStore } from "./firestore-store.js";
 import * as pg from "./db-pg.js";
 import { mapEvent } from "./mappers.js";
 import { computeKpis, type KpiRawData } from "./kpis.js";
@@ -27,20 +28,24 @@ export async function isEventOrganizer(eventId: string, userId: string, userRole
     const event = demoStore.getEventById(eventId);
     return event?.organizer_id === userId;
   }
+  if (isFirebaseMode()) {
+    const event = await firestoreStore.getEventById(eventId);
+    return event?.organizer_id === userId;
+  }
   const row = await pg.queryOne(`SELECT organizer_id FROM events WHERE id = $1`, [eventId]);
   return row?.organizer_id === userId;
 }
 
 export async function listOrganizerEvents(organizerId: string) {
-  if (isDemoMode()) {
-    return demoStore.listEventsByOrganizer(organizerId);
-  }
+  if (isDemoMode()) return demoStore.listEventsByOrganizer(organizerId);
+  if (isFirebaseMode()) return firestoreStore.listEventsByOrganizer(organizerId);
   const result = await pg.query(`SELECT * FROM events WHERE organizer_id = $1 ORDER BY starts_at DESC`, [organizerId]);
   return result.rows.map(mapEvent);
 }
 
 export async function getEventById(eventId: string): Promise<Event | null> {
   if (isDemoMode()) return demoStore.getEventById(eventId);
+  if (isFirebaseMode()) return firestoreStore.getEventById(eventId);
   const row = await pg.queryOne(`SELECT * FROM events WHERE id = $1`, [eventId]);
   return row ? mapEvent(row) : null;
 }
@@ -51,6 +56,9 @@ export async function createEvent(organizerId: string, input: z.infer<typeof cre
 
   if (isDemoMode()) {
     return demoStore.createEvent(organizerId, { ...input, slug, qr_code_token: qrToken });
+  }
+  if (isFirebaseMode()) {
+    return firestoreStore.createEvent(organizerId, { ...input, slug, qr_code_token: qrToken });
   }
 
   const row = await pg.queryOne(
@@ -78,6 +86,7 @@ export async function createEvent(organizerId: string, input: z.infer<typeof cre
 
 export async function updateEvent(eventId: string, input: z.infer<typeof updateEventSchema>) {
   if (isDemoMode()) return demoStore.updateEvent(eventId, input);
+  if (isFirebaseMode()) return firestoreStore.updateEvent(eventId, input);
 
   const row = await pg.queryOne(
     `UPDATE events SET
@@ -107,7 +116,11 @@ export async function updateEvent(eventId: string, input: z.infer<typeof updateE
 }
 
 export async function getEventKpis(eventId: string): Promise<EventKPIs> {
-  const raw = isDemoMode() ? demoStore.getKpiRawData(eventId) : await fetchPgKpiRawData(eventId);
+  const raw = isDemoMode()
+    ? demoStore.getKpiRawData(eventId)
+    : isFirebaseMode()
+      ? await firestoreStore.getKpiRawData(eventId)
+      : await fetchPgKpiRawData(eventId);
   return computeKpis(eventId, raw);
 }
 
@@ -156,6 +169,7 @@ async function fetchPgKpiRawData(eventId: string): Promise<KpiRawData> {
 
 export async function getOrganizerParticipants(eventId: string) {
   if (isDemoMode()) return demoStore.getOrganizerParticipants(eventId);
+  if (isFirebaseMode()) return firestoreStore.getOrganizerParticipants(eventId);
 
   const result = await pg.query(
     `SELECT ep.id, ep.status, ep.visible_in_event, ep.checked_in_at, ep.created_at,

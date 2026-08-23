@@ -1,34 +1,22 @@
 import type { CardProfile } from "@hirnao/shared";
-import {
-  cardToEmbeddingText,
-  generateEmbedding,
-  runFullMatchingPipeline,
-  toAgentContext,
-} from "@hirnao/ai";
-import { query, queryOne } from "./db-pg.js";
-import { mapCard } from "./mappers.js";
-import { getAiRuntime } from "./ai-runtime.js";
-import { isDemoMode, demoStore } from "./db.js";
+import { isDemoMode, isFirebaseMode } from "./db.js";
 
-export { cardToEmbeddingText, toAgentContext };
+export { cardToEmbeddingText, toAgentContext } from "@hirnao/ai";
 
-export async function upsertCardEmbedding(cardId: string, card: CardProfile) {
-  const text = cardToEmbeddingText(card);
-  const { embedding, model } = await generateEmbedding(text);
-  const vectorStr = `[${embedding.join(",")}]`;
-
-  await query(`DELETE FROM card_embeddings WHERE card_id = $1`, [cardId]);
-  await query(
-    `INSERT INTO card_embeddings (card_id, embedding, model_version) VALUES ($1, $2::vector, $3)`,
-    [cardId, vectorStr, model],
-  );
+export async function upsertCardEmbedding(_cardId: string, _card: CardProfile) {
+  // Vector embeddings are not persisted in Firebase mode (rule-based matching instead).
 }
 
 export async function generateRecommendations(eventId: string, userId: string) {
-  if (isDemoMode()) {
-    const { generateDemoRecommendationsWithAgents } = await import("./data.js");
-    return generateDemoRecommendationsWithAgents(userId, eventId);
+  if (isDemoMode() || isFirebaseMode()) {
+    const { generateAgentRecommendations } = await import("./data.js");
+    return generateAgentRecommendations(userId, eventId);
   }
+
+  const { query, queryOne } = await import("./db-pg.js");
+  const { mapCard } = await import("./mappers.js");
+  const { cardToEmbeddingText, generateEmbedding, runFullMatchingPipeline } = await import("@hirnao/ai");
+  const { getAiRuntime } = await import("./ai-runtime.js");
 
   const allCards = await query(
     `SELECT cp.* FROM card_profiles cp
