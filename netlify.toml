@@ -1,0 +1,27 @@
+# Netlify — static PWA frontend (monorepo apps/web)
+# API is deployed separately; set API_URL in Netlify env for /api proxy if needed.
+
+[build]
+  command = "STATIC_EXPORT=true npm run build:pages"
+  publish = "out"
+
+[build.environment]
+  NODE_VERSION = "24"
+
+# Optional: proxy API calls to a hosted backend (uncomment and set API_URL in Netlify UI)
+# [[redirects]]
+#   from = "/api/*"
+#   to = ":api_url/:splat"
+#   status = 200
+#   force = true
+
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
