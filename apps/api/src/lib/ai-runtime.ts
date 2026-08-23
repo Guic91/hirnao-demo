@@ -1,5 +1,6 @@
 import { createAgentService, getAiMode, type LlmUsageCallback } from "@hirnao/ai";
-import { isDemoMode } from "./db.js";
+import { isDemoMode, isFirebaseMode } from "./db.js";
+import { firestoreStore } from "./firestore-store.js";
 import * as pg from "./db-pg.js";
 
 const usageLogs: Array<{
@@ -15,7 +16,9 @@ export function getAiRuntime(locale: "fr" | "en" = "fr") {
   const onUsage: LlmUsageCallback = async (usage) => {
     usageLogs.push({ ...usage, created_at: new Date().toISOString() });
 
-    if (!isDemoMode()) {
+    if (isFirebaseMode()) {
+      await firestoreStore.logAiUsage(usage);
+    } else if (!isDemoMode()) {
       await pg.query(
         `INSERT INTO ai_usage_logs (operation, model, input_tokens, output_tokens, metadata)
          VALUES ($1, $2, $3, $4, $5)`,

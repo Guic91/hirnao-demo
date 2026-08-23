@@ -1,5 +1,6 @@
-import { isDemoMode } from "./db.js";
+import { isDemoMode, isFirebaseMode } from "./db.js";
 import { demoStore } from "./demo-store.js";
+import { firestoreStore } from "./firestore-store.js";
 import * as pg from "./db-pg.js";
 import { mapEvent, mapUser } from "./mappers.js";
 import { getAiUsageStats } from "./ai-runtime.js";
@@ -16,6 +17,7 @@ export interface AdminStats {
 
 export async function listAdminUsers(limit = 50, offset = 0) {
   if (isDemoMode()) return demoStore.listAllUsers(limit, offset);
+  if (isFirebaseMode()) return firestoreStore.listAllUsers(limit, offset);
   const result = await pg.query(
     `SELECT id, email, display_name, locale, role, email_verified, created_at
      FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
@@ -27,6 +29,7 @@ export async function listAdminUsers(limit = 50, offset = 0) {
 
 export async function listAdminEvents(limit = 50, offset = 0) {
   if (isDemoMode()) return demoStore.listAllEvents(limit, offset);
+  if (isFirebaseMode()) return firestoreStore.listAllEvents(limit, offset);
   const result = await pg.query(
     `SELECT e.*, u.display_name AS organizer_name,
             (SELECT COUNT(*)::int FROM event_participants ep WHERE ep.event_id = e.id) AS participant_count
@@ -43,6 +46,7 @@ export async function listAdminEvents(limit = 50, offset = 0) {
 
 export async function listReports(status?: string) {
   if (isDemoMode()) return { reports: demoStore.listReports(status) };
+  if (isFirebaseMode()) return { reports: await firestoreStore.listReports(status) };
   const result = status
     ? await pg.query(`SELECT * FROM reports WHERE status = $1 ORDER BY created_at DESC`, [status])
     : await pg.query(`SELECT * FROM reports ORDER BY created_at DESC`);
@@ -51,12 +55,18 @@ export async function listReports(status?: string) {
 
 export async function updateReportStatus(reportId: string, status: string) {
   if (isDemoMode()) return demoStore.updateReport(reportId, status);
+  if (isFirebaseMode()) return firestoreStore.updateReport(reportId, status);
   return pg.queryOne(`UPDATE reports SET status = $2 WHERE id = $1 RETURNING *`, [reportId, status]);
 }
 
 export async function getAdminStats(): Promise<AdminStats> {
   if (isDemoMode()) {
     const stats = demoStore.getAdminStats();
+    stats.ai_calls = getAiUsageStats().total_calls;
+    return stats;
+  }
+  if (isFirebaseMode()) {
+    const stats = await firestoreStore.getAdminStats();
     stats.ai_calls = getAiUsageStats().total_calls;
     return stats;
   }
@@ -83,6 +93,9 @@ export async function getAdminStats(): Promise<AdminStats> {
 export async function getAdminAiUsage() {
   const stats = getAiUsageStats();
   if (isDemoMode()) return stats;
+  if (isFirebaseMode()) {
+    return { ...stats, by_operation: await firestoreStore.getAiUsageByOperation() };
+  }
   const result = await pg.query(
     `SELECT operation, model, SUM(input_tokens)::int AS input_tokens, SUM(output_tokens)::int AS output_tokens, COUNT(*)::int AS calls
      FROM ai_usage_logs GROUP BY operation, model ORDER BY calls DESC`,
@@ -92,6 +105,7 @@ export async function getAdminAiUsage() {
 
 export async function getAuditLogs(limit = 50) {
   if (isDemoMode()) return { logs: demoStore.getAuditLogs(limit) };
+  if (isFirebaseMode()) return { logs: await firestoreStore.getAuditLogs(limit) };
   const result = await pg.query(
     `SELECT al.*, u.display_name AS actor_name FROM audit_logs al
      LEFT JOIN users u ON u.id = al.actor_id ORDER BY al.created_at DESC LIMIT $1`,
@@ -100,9 +114,19 @@ export async function getAuditLogs(limit = 50) {
   return { logs: result.rows };
 }
 
-export async function logAudit(actorId: string | null, action: string, resource: string, resourceId?: string, metadata?: Record<string, unknown>) {
+export async function logAudit(
+  actorId: string | null,
+  action: string,
+  resource: string,
+  resourceId?: string,
+  metadata?: Record<string, unknown>,
+) {
   if (isDemoMode()) {
     demoStore.addAuditLog({ actor_id: actorId, action, resource, resource_id: resourceId, metadata });
+    return;
+  }
+  if (isFirebaseMode()) {
+    await firestoreStore.addAuditLog({ actor_id: actorId, action, resource, resource_id: resourceId, metadata });
     return;
   }
   await pg.query(
