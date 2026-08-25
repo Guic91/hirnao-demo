@@ -49,6 +49,25 @@
     return h;
   }
 
+  function seedSupabaseSession() {
+    try {
+      var t = token();
+      if (!t) return;
+      var key = "sb-" + location.hostname.split(".")[0] + "-auth-token";
+      if (localStorage.getItem(key)) return;
+      var u = {};
+      try { u = JSON.parse(localStorage.getItem("hirnao_user") || "{}"); } catch (e) {}
+      localStorage.setItem(key, JSON.stringify({
+        access_token: t,
+        token_type: "bearer",
+        expires_in: 3600,
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+        user: { id: u.id, email: u.email, role: "authenticated" },
+      }));
+    } catch (e) {}
+  }
+  seedSupabaseSession();
+
   function cut() {
     if (audioEl) {
       try {
@@ -322,6 +341,15 @@
   window.fetch = function (input, init) {
     try {
       var url = typeof input === "string" ? input : (input && input.url) || "";
+      init = init ? Object.assign({}, init) : {};
+      if (/\/api\/v1\//.test(url)) {
+        var hdrs = Object.assign({}, init.headers || {});
+        if (!hdrs.Authorization && !hdrs.authorization) {
+          var tok = token();
+          if (tok) hdrs.Authorization = "Bearer " + tok;
+        }
+        init.headers = hdrs;
+      }
       if (pendingAnswer && /\/agent\/answer/.test(url) && init && init.body) {
         var body = typeof init.body === "string" ? JSON.parse(init.body) : init.body;
         if (body && typeof body === "object") {
@@ -435,6 +463,20 @@
   }
   if (document.body) watch();
   else document.addEventListener("DOMContentLoaded", watch);
+
+  function recoverNotFound() {
+    try {
+      var txt = (document.body && document.body.innerText) || "";
+      if (!/ÉVÉNEMENT INTROUVABLE|EVENT NOT FOUND|introuvable/i.test(txt)) return;
+      if (!token()) return;
+      if (sessionStorage.getItem("hn-voice-recovered")) return;
+      sessionStorage.setItem("hn-voice-recovered", "1");
+      seedSupabaseSession();
+      location.reload();
+    } catch (e) {}
+  }
+  setTimeout(recoverNotFound, 800);
+  setTimeout(recoverNotFound, 1800);
 
   var style = document.createElement("style");
   style.textContent =
