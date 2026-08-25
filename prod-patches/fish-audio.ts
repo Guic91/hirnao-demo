@@ -1,49 +1,91 @@
 /**
- * Fish Audio — voix d'onboarding (TTS + ASR).
- * Clé serveur uniquement : FISH_API_KEY (ou FISH_AUDIO_API_KEY).
+ * Fish Audio via OpenRouter — voix d'onboarding (TTS + ASR).
+ * Clé: OPENROUTER_API_KEY (fallback FISH_API_KEY / FISH_AUDIO_API_KEY).
  */
+import { existsSync, readFileSync } from "fs";
 
-const FISH_API = "https://api.fish.audio";
+const OPENROUTER_API = "https://openrouter.ai/api/v1";
+const KEY_FILE = process.env.OPENROUTER_KEY_FILE || "/app/.openrouter-key";
+
+function readKeyFile(): string | undefined {
+  try {
+    if (existsSync(KEY_FILE)) {
+      const v = readFileSync(KEY_FILE, "utf8").trim();
+      return v || undefined;
+    }
+  } catch {
+    /* ignore */
+  }
+  return undefined;
+}
 
 export function fishApiKey(): string | undefined {
-  return process.env.FISH_API_KEY || process.env.FISH_AUDIO_API_KEY || undefined;
+  return (
+    process.env.OPENROUTER_API_KEY ||
+    process.env.FISH_API_KEY ||
+    process.env.FISH_AUDIO_API_KEY ||
+    readKeyFile() ||
+    undefined
+  );
 }
 
 export function isFishAvailable(): boolean {
   return Boolean(fishApiKey());
 }
 
-function fishModel(): string {
-  return process.env.FISH_TTS_MODEL || "s2.1-pro-free";
+function ttsModel(): string {
+  return (
+    process.env.OPENROUTER_TTS_MODEL ||
+    process.env.FISH_TTS_MODEL ||
+    "fish-audio/s2.1-pro-free:free"
+  );
+}
+
+function sttModel(): string {
+  return process.env.OPENROUTER_STT_MODEL || "fish-audio/transcribe-1";
+}
+
+function orHeaders(key: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${key}`,
+    "Content-Type": "application/json",
+    "HTTP-Referer": process.env.WEB_URL || "https://hirnao.com",
+    "X-Title": "HIRNAO",
+  };
 }
 
 export async function fishTts(text: string): Promise<Buffer> {
   const key = fishApiKey();
-  if (!key) throw new Error("FISH_API_KEY missing");
+  if (!key) throw new Error("OPENROUTER_API_KEY missing");
 
   const body: Record<string, unknown> = {
-    text: text.slice(0, 2000),
-    format: "mp3",
-    latency: "balanced",
-    normalize: true,
-    prosody: { speed: 1.02, volume: 0, normalize_loudness: true },
+    model: ttsModel(),
+    input: text.slice(0, 2000),
+    response_format: "mp3",
   };
-  const voice = process.env.FISH_VOICE_ID;
-  if (voice) body.reference_id = voice;
+  const voice = process.env.FISH_VOICE_ID || process.env.OPENROUTER_TTS_VOICE;
+  if (voice) body.voice = voice;
 
-  const res = await fetch(`${FISH_API}/v1/tts`, {
+  const res = await fetch(`${OPENROUTER_API}/audio/speech`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-      model: fishModel(),
-    },
+    headers: orHeaders(key),
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    throw new Error(`Fish TTS ${res.status}: ${await res.text()}`);
+    throw new Error(`OpenRouter Fish TTS ${res.status}: ${await res.text()}`);
   }
   return Buffer.from(await res.arrayBuffer());
+}
+
+function audioFormat(mimeType?: string, filename?: string): string {
+  const hint = `${mimeType ?? ""} ${filename ?? ""}`.toLowerCase();
+  if (hint.includes("wav")) return "wav";
+  if (hint.includes("mp3") || hint.includes("mpeg")) return "mp3";
+  if (hint.includes("ogg")) return "ogg";
+  if (hint.includes("m4a") || hint.includes("mp4")) return "m4a";
+  if (hint.includes("flac")) return "flac";
+  if (hint.includes("aac")) return "aac";
+  return "webm";
 }
 
 export async function fishAsr(
@@ -51,23 +93,27 @@ export async function fishAsr(
   options?: { locale?: "fr" | "en"; filename?: string; mimeType?: string },
 ): Promise<{ text: string; provider: string; model: string }> {
   const key = fishApiKey();
-  if (!key) throw new Error("FISH_API_KEY missing");
+  if (!key) throw new Error("OPENROUTER_API_KEY missing");
 
-  const form = new FormData();
-  const blob = new Blob([audio as unknown as BlobPart], {
-    type: options?.mimeType ?? "audio/webm",
-  });
-  form.append("audio", blob, options?.filename ?? "turn.webm");
-  if (options?.locale) form.append("language", options.locale);
+  const model = sttModel();
+  const format = audioFormat(options?.mimeType, options?.filename);
+  const body: Record<string, unknown> = {
+    model,
+    input_audio: {
+      data: Buffer.from(audio).toString("base64"),
+      format,
+    },
+  };
+  if (options?.locale) body.language = options.locale;
 
-  const res = await fetch(`${FISH_API}/v1/asr`, {
+  const res = await fetch(`${OPENROUTER_API}/audio/transcriptions`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${key}` },
-    body: form,
+    headers: orHeaders(key),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
-    throw new Error(`Fish ASR ${res.status}: ${await res.text()}`);
+    throw new Error(`OpenRouter Fish ASR ${res.status}: ${await res.text()}`);
   }
   const data = (await res.json()) as { text?: string };
-  return { text: data.text?.trim() ?? "", provider: "fish", model: "asr" };
+  return { text: data.text?.trim() ?? "", provider: "openrouter-fish", model };
 }

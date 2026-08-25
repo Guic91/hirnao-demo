@@ -1,5 +1,6 @@
 /**
  * Transcription (audio → texte) pour l'appel d'onboarding.
+ * Privilégie Fish Audio via OpenRouter quand OPENROUTER_API_KEY est définie.
  */
 import { fishApiKey, fishAsr } from "./fish-audio.js";
 
@@ -18,7 +19,7 @@ interface ProviderConfig {
 
 function preferFish(): boolean {
   const provider = (process.env.STT_PROVIDER ?? "").toLowerCase();
-  return Boolean(fishApiKey()) && (provider === "fish" || provider === "" || provider === "auto");
+  return Boolean(fishApiKey()) && (provider === "fish" || provider === "openrouter" || provider === "" || provider === "auto");
 }
 
 function getProviderConfig(): ProviderConfig {
@@ -56,7 +57,8 @@ export async function transcribeAudio(
   audio: Uint8Array,
   options?: { locale?: "fr" | "en"; filename?: string; mimeType?: string },
 ): Promise<TranscriptionResult> {
-  if (preferFish() || (process.env.STT_PROVIDER ?? "").toLowerCase() === "fish") {
+  const forced = (process.env.STT_PROVIDER ?? "").toLowerCase();
+  if (preferFish() || forced === "fish" || forced === "openrouter") {
     return fishAsr(audio, options);
   }
   const config = getProviderConfig();
