@@ -1,0 +1,1 @@
+Hirnao production voice patches (Fish Audio + Suivant). Applied to running Coolify containers; a image redeploy wipes them unless rebuilt.
