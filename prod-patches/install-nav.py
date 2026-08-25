@@ -24,10 +24,16 @@ print("html patched", n)
 
 conf = Path("/etc/nginx/conf.d/default.conf")
 c = conf.read_text()
-if "hirnao-nav.js" not in c:
-    snippet = '    location = /hirnao-nav.js { add_header Cache-Control "no-store, must-revalidate"; }\n'
-    if "    location / {\n" in c:
-        c = c.replace("    location / {\n", snippet + "    location / {\n", 1)
+if "location = /hirnao-nav.js" not in c:
+    snippet = '  location = /hirnao-nav.js { add_header Cache-Control "no-store, must-revalidate"; }\n'
+    if "location = /hirnao-voice.js" in c:
+        c = c.replace(
+            "location = /hirnao-voice.js",
+            snippet + "  location = /hirnao-voice.js",
+            1,
+        )
+    elif "  location / {\n" in c:
+        c = c.replace("  location / {\n", snippet + "  location / {\n", 1)
     else:
         c = c.replace("}\n", snippet + "}\n", 1)
     conf.write_text(c)
